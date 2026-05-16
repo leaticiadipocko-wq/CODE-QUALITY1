@@ -7,7 +7,10 @@ on:
     branches: ["main"]
 
 jobs:
-  lint:
+  # ============================================================
+  # STAGE 1: CODE QUALITY ANALYSIS
+  # ============================================================
+  linting:
     name: Code Quality (ESLint)
     runs-on: ubuntu-latest
     steps:
@@ -18,9 +21,61 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: 'npm'
 
       - name: Install dependencies
         run: npm ci
 
       - name: Run ESLint
         run: npm run lint
+        continue-on-error: false
+
+  # ============================================================
+  # STAGE 2: SECURITY SCANNING
+  # ============================================================
+  security:
+    name: Security Scan (Snyk)
+    needs: linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run Snyk Security Scan
+        uses: snyk/actions/node@master
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --severity-threshold=high
+        continue-on-error: false
+
+  # ============================================================
+  # STAGE 3: REPORTING & DEPLOYMENT
+  # ============================================================
+  deploy:
+    name: Deployment & Reporting
+    needs: [linting, security]
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && success()
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Report Success
+        run: |
+          echo "✅ All quality and security checks passed!"
+          echo "📊 Stage 1: Code Quality (ESLint) - PASSED"
+          echo "🔒 Stage 2: Security Scan (Snyk) - PASSED"
+          echo "🚀 Ready for deployment to production"
+
+      - name: Deployment Simulation
+        run: echo "✨ Code Quality Analysis Tool - Production Deployment Ready"
